@@ -100,9 +100,36 @@ curl -X POST http://localhost:8080/v1/audio/transcriptions \
   -F "file=@test.wav" -F "model=base.en"
 ```
 
+## macOS (Apple Silicon) — Native Mode
+
+macOS runs all services natively (no Docker) for Metal/MPS GPU acceleration.
+
+### Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/setup-mac.sh` | Install Homebrew packages, clone Kokoro-FastAPI, download models |
+| `scripts/start-mac.sh` | Launch all services + Vite dev server |
+| `scripts/stop-mac.sh` | Kill all running services |
+
+### How It Works
+
+- **LLM**: `llama-server` via Homebrew — Metal GPU auto-enabled
+- **TTS**: Kokoro-FastAPI cloned to `~/.nodeava/kokoro-fastapi/`, run via `uv` with `DEVICE_TYPE=mps` (PyTorch MPS)
+- **STT**: `whisper-server` via Homebrew — Metal GPU auto-enabled
+- **Frontend**: Vite dev server (no nginx) — same proxy config routes to native services
+- **Same ports**: LLM 8081, TTS 8880, STT 8080, Frontend 3000 — identical to Docker setup
+- **PID files**: Written to `.pids/` for process management
+- **Logs**: Written to `logs/` (both dirs gitignored)
+
+### Why Not Docker on Mac
+
+Docker Desktop on macOS runs a Linux VM — no GPU passthrough to Metal/MPS. Docker services would run CPU-only, too slow for TTS inference.
+
 ## Known Constraints
 
 - Default avatar (default-avatar.glb) is CC BY-NC-SA 4.0, licensed separately from project code (Apache-2.0).
 - AMD TTS uses ROCm (first build ~20-30 min, ~22GB image)
 - Windows + AMD GPU = not supported (Docker Desktop/WSL2 limitation)
 - Minimum 8 GB VRAM recommended (~4.8 GB actual usage)
+- macOS: requires Apple Silicon (M1+), 16 GB unified memory recommended

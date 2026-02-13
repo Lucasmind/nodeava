@@ -6,4 +6,6 @@ models/*.gguf
 *.log
 .DS_Store
 .vite/
+.pids/
+logs/
 .playwright-mcp/
