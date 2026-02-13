@@ -23,17 +23,9 @@ NodeAva is a 3D talking avatar powered entirely by local AI models:
 - **Disk**: ~5 GB for models + ~10 GB for Docker images (AMD: ~30 GB due to ROCm)
 - **OS**: Linux or Windows (with Docker Desktop)
 
-## Getting an Avatar
+## Avatar
 
-NodeAva doesn't ship with an avatar model for licensing reasons. You need to provide a GLB file with ARKit blend shapes and Oculus Visemes.
-
-**Quickest path:**
-1. Download [VRoid Studio](https://vroid.com/en/studio) (free)
-2. Create a character
-3. Export as VRM (TalkingHead supports VRM natively)
-4. Save as `frontend/public/avatars/default-avatar.glb`
-
-See `frontend/public/avatars/README.md` for more options.
+NodeAva ships with a default avatar (sourced from the [TalkingHead](https://github.com/met4citizen/TalkingHead) project). The avatar is licensed under CC BY-NC-SA 4.0 — separately from the project code. See `frontend/public/avatars/README.md` for how to swap it out or add your own.
 
 ## Quick Start
 

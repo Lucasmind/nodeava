@@ -3,7 +3,6 @@ dist/
 .env
 models/*.bin
 models/*.gguf
-frontend/public/avatars/*.glb
 *.log
 .DS_Store
 .vite/

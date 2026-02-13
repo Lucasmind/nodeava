@@ -23,6 +23,16 @@ NodeAva depends on the following open-source components.
 Kokoro-FastAPI includes code derived from:
 - **StyleTTS2** — MIT License — [yl4579/StyleTTS2](https://github.com/yl4579/StyleTTS2)
 
+## Avatar Model
+
+The included avatar is licensed **separately** from the project code (Apache-2.0). If you use NodeAva commercially, replace it with your own avatar.
+
+| Asset | License | Source | Notes |
+|-------|---------|--------|-------|
+| **default-avatar.glb** | CC BY-NC-SA 4.0 | [Ready Player Me](https://readyplayer.me) / Netflix | Non-commercial only. Attribution required. |
+
+Avatar sourced from the [TalkingHead](https://github.com/met4citizen/TalkingHead) project by [met4citizen](https://github.com/met4citizen).
+
 ## Frontend Libraries
 
 | Component | License | Source |

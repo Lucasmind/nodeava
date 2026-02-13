@@ -102,7 +102,7 @@ curl -X POST http://localhost:8080/v1/audio/transcriptions \
 
 ## Known Constraints
 
-- Avatar .glb not included (licensing). Users must provide their own.
+- Default avatar (default-avatar.glb) is CC BY-NC-SA 4.0, licensed separately from project code (Apache-2.0).
 - AMD TTS uses ROCm (first build ~20-30 min, ~22GB image)
 - Windows + AMD GPU = not supported (Docker Desktop/WSL2 limitation)
 - Minimum 8 GB VRAM recommended (~4.8 GB actual usage)
