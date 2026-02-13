@@ -54,7 +54,7 @@ export class STTManager {
     } catch (err) {
       error('VAD initialization failed:', err);
       this.initializing = false;
-      throw err;
+      throw this._classifyError(err, 'init');
     }
   }
 
@@ -94,7 +94,9 @@ export class STTManager {
       });
 
       if (!response.ok) {
-        throw new Error(`STT HTTP ${response.status}: ${response.statusText}`);
+        const err = new Error(`STT HTTP ${response.status}: ${response.statusText}`);
+        err.status = response.status;
+        throw err;
       }
 
       const result = await response.json();
@@ -107,9 +109,28 @@ export class STTManager {
         log('Empty transcription');
       }
     } catch (err) {
-      error('Transcription failed:', err);
-      if (this.onError) this.onError(err);
+      const classified = this._classifyError(err, 'transcribe');
+      error('Transcription failed:', classified.message);
+      if (this.onError) this.onError(classified);
     }
+  }
+
+  _classifyError(err, context) {
+    if (context === 'init') {
+      if (err.name === 'NotAllowedError' || err.message?.includes('Permission denied')) {
+        return new Error('Microphone permission denied — allow mic access and try again');
+      }
+      if (err.name === 'NotFoundError') {
+        return new Error('No microphone found — connect a microphone and try again');
+      }
+      return new Error(`Mic initialization failed: ${err.message}`);
+    }
+    if (err.status === 503) return new Error('STT service is busy — try again shortly');
+    if (err.status >= 500) return new Error(`STT server error (${err.status}) — check service logs`);
+    if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+      return new Error('Cannot reach STT service — check if container is running');
+    }
+    return err;
   }
 
   get isListening() {

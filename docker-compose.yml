@@ -7,11 +7,11 @@ services:
       - "${FRONTEND_PORT:-3000}:80"
     depends_on:
       stt:
-        condition: service_started
+        condition: service_healthy
       tts:
-        condition: service_started
+        condition: service_healthy
       llm:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
 
   llm:
@@ -27,12 +27,24 @@ services:
       --jinja --reasoning-format none
       --temp 0.6 --top-k 20 --top-p 0.95 --min-p 0
       --n-gpu-layers 0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/models"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
     restart: unless-stopped
 
   tts:
     image: ghcr.io/remsky/kokoro-fastapi-gpu:v0.2.4
     ports:
       - "${TTS_PORT:-8880}:8880"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8880/v1/models"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
     restart: unless-stopped
 
   stt:
@@ -46,4 +58,10 @@ services:
       - STT_PORT=8080
     ports:
       - "${STT_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
     restart: unless-stopped

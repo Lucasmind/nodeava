@@ -1,7 +1,7 @@
 FROM ghcr.io/ggml-org/whisper.cpp:main-vulkan
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends wget && \
+    apt-get install -y --no-install-recommends wget curl && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

@@ -32,7 +32,9 @@ export class LLMClient {
       });
 
       if (!response.ok) {
-        throw new Error(`LLM HTTP ${response.status}: ${response.statusText}`);
+        const err = new Error(`LLM HTTP ${response.status}: ${response.statusText}`);
+        err.status = response.status;
+        throw err;
       }
 
       const reader = response.body.getReader();
@@ -75,11 +77,31 @@ export class LLMClient {
         log('LLM request aborted');
         return;
       }
-      error('LLM error:', err);
-      if (onError) onError(err);
+      const classified = this._classifyError(err);
+      error('LLM error:', classified.message);
+      if (onError) onError(classified);
     } finally {
       this.abortController = null;
     }
+  }
+
+  _classifyError(err) {
+    if (err.status === 503) {
+      return new Error('LLM service is busy — try again shortly');
+    }
+    if (err.status === 404) {
+      return new Error('LLM model not found — check model configuration');
+    }
+    if (err.status >= 500) {
+      return new Error(`LLM server error (${err.status}) — check service logs`);
+    }
+    if (err.status >= 400) {
+      return new Error(`LLM request error (${err.status}) — ${err.message}`);
+    }
+    if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+      return new Error('Cannot reach LLM service — check if container is running');
+    }
+    return err;
   }
 
   abort() {
