@@ -196,8 +196,8 @@ export class Orchestrator {
         this._tokenBuffer = this._rawBuffer.slice(closeIdx + THINK_CLOSE.length).replace(/^\s+/, '');
         log('Thinking done, streaming final response');
       }
-    } else if (this._isThinking) {
-      // Past thinking — append new tokens directly
+    } else {
+      // Past detection/thinking — append new tokens directly
       this._tokenBuffer += token;
     }
 

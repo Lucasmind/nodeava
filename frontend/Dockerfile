@@ -5,6 +5,10 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 COPY . .
 RUN npm run build
+# TalkingHead dynamically imports lipsync modules at runtime (path constructed
+# from language code, invisible to Vite's bundler). Copy them into dist/assets/
+# so they resolve alongside the main bundle chunk.
+RUN cp node_modules/@met4citizen/talkinghead/modules/lipsync-*.mjs dist/assets/
 
 # Stage 2: Serve with nginx
 FROM nginx:alpine
