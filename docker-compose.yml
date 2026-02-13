@@ -1,0 +1,49 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      stt:
+        condition: service_started
+      tts:
+        condition: service_started
+      llm:
+        condition: service_started
+    restart: unless-stopped
+
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    volumes:
+      - ./models:/models:ro
+    ports:
+      - "${LLM_PORT:-8081}:8080"
+    command: >
+      -m /models/${LLM_MODEL_FILE:-Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf}
+      --host 0.0.0.0 --port 8080
+      --ctx-size ${LLM_CTX_SIZE:-4096}
+      --jinja --reasoning-format none
+      --temp 0.6 --top-k 20 --top-p 0.95 --min-p 0
+      --n-gpu-layers 0
+    restart: unless-stopped
+
+  tts:
+    image: ghcr.io/remsky/kokoro-fastapi-gpu:v0.2.4
+    ports:
+      - "${TTS_PORT:-8880}:8880"
+    restart: unless-stopped
+
+  stt:
+    build:
+      context: ./stt-service
+      dockerfile: Dockerfile
+    volumes:
+      - ./models:/models
+    environment:
+      - WHISPER_MODEL=${WHISPER_MODEL:-base.en}
+      - STT_PORT=8080
+    ports:
+      - "${STT_PORT:-8080}:8080"
+    restart: unless-stopped

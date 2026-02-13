@@ -1,0 +1,44 @@
+services:
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server-vulkan
+    command: >
+      -m /models/${LLM_MODEL_FILE:-Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf}
+      --host 0.0.0.0 --port 8080
+      --ctx-size ${LLM_CTX_SIZE:-4096}
+      --jinja --reasoning-format none
+      --temp 0.6 --top-k 20 --top-p 0.95 --min-p 0
+      --n-gpu-layers 999
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - ./models:/models:ro
+      - /usr/share/vulkan/icd.d:/usr/share/vulkan/icd.d:ro
+    environment:
+      - GGML_VULKAN_DEVICE=0
+    group_add:
+      - video
+
+  tts:
+    build:
+      context: ./docker/kokoro-rocm
+    image: nodeava-kokoro-rocm:latest
+    ports:
+      - "${TTS_PORT:-8880}:8880"
+    environment:
+      - USE_GPU=true
+    devices:
+      - /dev/dri:/dev/dri
+      - /dev/kfd:/dev/kfd
+    group_add:
+      - video
+      - render
+
+  stt:
+    devices:
+      - /dev/dri:/dev/dri
+      - /dev/kfd:/dev/kfd
+    volumes:
+      - /usr/share/vulkan/icd.d:/usr/share/vulkan/icd.d:ro
+    group_add:
+      - video
+      - render

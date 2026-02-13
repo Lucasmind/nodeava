@@ -1,0 +1,35 @@
+services:
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    command: >
+      -m /models/${LLM_MODEL_FILE:-Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf}
+      --host 0.0.0.0 --port 8080
+      --ctx-size ${LLM_CTX_SIZE:-4096}
+      --jinja --reasoning-format none
+      --temp 0.6 --top-k 20 --top-p 0.95 --min-p 0
+      --n-gpu-layers 999
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  tts:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  stt:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
