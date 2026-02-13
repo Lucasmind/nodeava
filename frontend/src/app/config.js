@@ -16,7 +16,7 @@ Examples:
 [neutral] The capital of France is Paris.
 [sad] I'm sorry to hear that happened.
 
-Important: Always include the emotion tag. Never skip it.`,
+Important: Always include the emotion tag. Never skip it. Never use emojis.`,
 
   // Avatar settings
   avatarUrl: '/avatars/default-avatar.glb',

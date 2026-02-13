@@ -18,6 +18,8 @@ const THINK_OPEN = '<think>';
 const THINK_CLOSE = '</think>';
 // Regex to strip <think>...</think> blocks from full text (for history cleanup)
 const THINK_BLOCK_RE = /<think>[\s\S]*?<\/think>\s*/g;
+// Strip emojis so TTS doesn't read them aloud as descriptions
+const EMOJI_RE = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]+/gu;
 
 export class Orchestrator {
   constructor() {
@@ -33,6 +35,7 @@ export class Orchestrator {
     this.onStateChange = null;
     this.onUserSpeech = null;
     this.onAssistantToken = null;
+    this.onAssistantSentence = null;
     this.onAssistantDone = null;
     this.onError = null;
 
@@ -228,9 +231,12 @@ export class Orchestrator {
   }
 
   _enqueueTTS(text) {
+    const clean = text.replace(EMOJI_RE, '').replace(/\s{2,}/g, ' ').trim();
+    if (!clean) return;
     this.state.transition(States.SPEAKING);
     this._pendingSentences++;
-    this.tts.synthesize(text);
+    if (this.onAssistantSentence) this.onAssistantSentence(clean);
+    this.tts.synthesize(clean);
   }
 
   _handleStreamDone(fullText) {
@@ -257,12 +263,10 @@ export class Orchestrator {
       }
     }
 
-    // Flush remaining text
+    // Flush remaining text through the same cleanup path
     const remaining = this._tokenBuffer.trim();
     if (remaining) {
-      this.state.transition(States.SPEAKING);
-      this._pendingSentences++;
-      this.tts.synthesize(remaining);
+      this._enqueueTTS(remaining);
     }
     this._tokenBuffer = '';
     this._llmDone = true;

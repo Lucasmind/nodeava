@@ -48,8 +48,13 @@ export class UIManager {
       this.subtitles.showUser(text);
     };
 
-    orch.onAssistantToken = (word) => {
-      this.subtitles.appendAssistant(word);
+    orch.onAssistantSentence = (text) => {
+      this.subtitles.appendSentence(text);
+    };
+
+    orch.onAssistantDone = (text) => {
+      this.subtitles.replaceAssistant(text);
+      this.subtitles.scheduleCleanup();
     };
 
     orch.onError = (msg) => {
