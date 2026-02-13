@@ -21,6 +21,21 @@ const THINK_BLOCK_RE = /<think>[\s\S]*?<\/think>\s*/g;
 // Strip emojis so TTS doesn't read them aloud as descriptions
 const EMOJI_RE = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]+/gu;
 
+// Clean text for TTS: strip markdown and emojis so they aren't read aloud
+function cleanForTTS(text) {
+  return text
+    .replace(EMOJI_RE, '')             // emojis
+    .replace(/\*\*(.+?)\*\*/g, '$1')  // **bold** → bold
+    .replace(/\*(.+?)\*/g, '$1')      // *italic* → italic
+    .replace(/^#{1,6}\s+/gm, '')      // ### headings
+    .replace(/^---+$/gm, '')          // --- horizontal rules
+    .replace(/^[-*+]\s+/gm, '')       // - bullet points
+    .replace(/^\d+\.\s+/gm, '')       // 1. numbered lists
+    .replace(/`([^`]+)`/g, '$1')      // `code` → code
+    .replace(/\s{2,}/g, ' ')          // collapse whitespace
+    .trim();
+}
+
 export class Orchestrator {
   constructor() {
     this.avatar = new AvatarManager();
@@ -80,11 +95,13 @@ export class Orchestrator {
 
     // Wire TTS audio output → avatar lip sync
     this.tts.onAudioReady = (audioData) => {
-      this.avatar.speakAudio(audioData, {}, (word) => {
-        if (this.onAssistantToken) this.onAssistantToken(word);
-      });
+      if (audioData) {
+        this.avatar.speakAudio(audioData, {}, (word) => {
+          if (this.onAssistantToken) this.onAssistantToken(word);
+        });
+      }
 
-      // Track when sentences finish playing
+      // Track when sentences finish (null = TTS failed, still count it)
       this._pendingSentences--;
       if (this._pendingSentences <= 0 && this._llmDone) {
         this._finishSpeaking();
@@ -231,7 +248,7 @@ export class Orchestrator {
   }
 
   _enqueueTTS(text) {
-    const clean = text.replace(EMOJI_RE, '').replace(/\s{2,}/g, ' ').trim();
+    const clean = cleanForTTS(text);
     if (!clean) return;
     this.state.transition(States.SPEAKING);
     this._pendingSentences++;

@@ -4,10 +4,12 @@ import { log, error, warn } from '../utils/logger.js';
 export class TTSManager {
   constructor() {
     this.ready = false;
-    this.onAudioReady = null; // callback(audioData) — data ready for TalkingHead.speakAudio
+    this.onAudioReady = null; // callback(audioData | null) — null signals a failed sentence
     this._voice = config.ttsDefaultVoice;
     this._speed = config.ttsDefaultSpeed;
     this._abortController = null;
+    this._queue = [];
+    this._processing = false;
   }
 
   async init() {
@@ -16,13 +18,26 @@ export class TTSManager {
     log('TTS ready');
   }
 
-  async synthesize(text) {
+  synthesize(text) {
     if (!this.ready) {
       warn('TTS not ready, skipping synthesis');
+      if (this.onAudioReady) this.onAudioReady(null);
       return;
     }
-    if (!text?.trim()) return;
+    if (!text?.trim()) {
+      if (this.onAudioReady) this.onAudioReady(null);
+      return;
+    }
 
+    this._queue.push(text);
+    this._processNext();
+  }
+
+  async _processNext() {
+    if (this._processing || this._queue.length === 0) return;
+    this._processing = true;
+
+    const text = this._queue.shift();
     const t0 = performance.now();
     const charCount = text.length;
     log(`TTS synthesize (${charCount} chars): "${text.substring(0, 60)}..."`);
@@ -52,8 +67,15 @@ export class TTSManager {
 
       result = await res.json();
     } catch (err) {
-      if (err.name === 'AbortError') return;
+      if (err.name === 'AbortError') {
+        this._processing = false;
+        return;
+      }
       error('TTS synthesis error:', err);
+      // Signal failure so Orchestrator can decrement _pendingSentences
+      if (this.onAudioReady) this.onAudioReady(null);
+      this._processing = false;
+      this._processNext();
       return;
     }
 
@@ -61,9 +83,12 @@ export class TTSManager {
     log(`TTS audio ready in ${elapsed}ms (${charCount} chars): "${text.substring(0, 40)}..."`);
 
     const audioData = this._transformResponse(result);
-    if (audioData && this.onAudioReady) {
+    if (this.onAudioReady) {
       this.onAudioReady(audioData);
     }
+
+    this._processing = false;
+    this._processNext();
   }
 
   _transformResponse(result) {
@@ -106,6 +131,7 @@ export class TTSManager {
   }
 
   clear() {
+    this._queue = [];
     if (this._abortController) {
       this._abortController.abort();
       this._abortController = null;

@@ -4,6 +4,14 @@ const EMOJI_RE = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1
 function cleanDisplayText(text) {
   // Strip emojis
   text = text.replace(EMOJI_RE, '');
+  // Strip markdown formatting
+  text = text.replace(/\*\*(.+?)\*\*/g, '$1');  // **bold**
+  text = text.replace(/\*(.+?)\*/g, '$1');       // *italic*
+  text = text.replace(/^#{1,6}\s+/gm, '');       // ### headings
+  text = text.replace(/^---+$/gm, '');            // --- rules
+  text = text.replace(/^[-*+]\s+/gm, '');         // - bullets
+  text = text.replace(/^\d+\.\s+/gm, '');         // 1. numbered lists
+  text = text.replace(/`([^`]+)`/g, '$1');         // `code`
   // Normalize spaces before punctuation: " !" → "!"
   text = text.replace(/\s+([.,!?;:)])/g, '$1');
   // Normalize spaces after opening parens: "( " → "("
