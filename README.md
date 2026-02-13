@@ -2,6 +2,8 @@
 
 A self-contained digital avatar that thinks, speaks, and listens — running entirely on your machine.
 
+![NodeAva in Action](docs/demo.gif)
+
 ## A Quick Note
 
 I built this for myself as a proof of concept. It's a starting point, not a polished product. I'm sharing it because it was fun to build and maybe useful to others exploring the same space. I'm not looking to heavily maintain this — fork it, break it, make it your own. Good vibes to you! :v:
