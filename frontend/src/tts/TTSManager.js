@@ -10,6 +10,7 @@ export class TTSManager {
     this._abortController = null;
     this._queue = [];
     this._processing = false;
+    this._cancelled = false;
   }
 
   async init() {
@@ -36,6 +37,7 @@ export class TTSManager {
   async _processNext() {
     if (this._processing || this._queue.length === 0) return;
     this._processing = true;
+    this._cancelled = false;
 
     const text = this._queue.shift();
     const t0 = performance.now();
@@ -62,7 +64,9 @@ export class TTSManager {
       });
 
       if (!res.ok) {
-        throw new Error(`TTS HTTP ${res.status}: ${await res.text()}`);
+        const err = new Error(`TTS HTTP ${res.status}: ${await res.text()}`);
+        err.status = res.status;
+        throw err;
       }
 
       result = await res.json();
@@ -71,11 +75,11 @@ export class TTSManager {
         this._processing = false;
         return;
       }
-      error('TTS synthesis error:', err);
-      // Signal failure so Orchestrator can decrement _pendingSentences
+      const msg = this._classifyError(err);
+      error('TTS synthesis error:', msg);
       if (this.onAudioReady) this.onAudioReady(null);
       this._processing = false;
-      this._processNext();
+      if (!this._cancelled) this._processNext();
       return;
     }
 
@@ -88,7 +92,7 @@ export class TTSManager {
     }
 
     this._processing = false;
-    this._processNext();
+    if (!this._cancelled) this._processNext();
   }
 
   _transformResponse(result) {
@@ -130,8 +134,19 @@ export class TTSManager {
     this._speed = speed;
   }
 
+  _classifyError(err) {
+    if (err.status === 503) return 'TTS service is busy — try again shortly';
+    if (err.status >= 500) return `TTS server error (${err.status}) — check service logs`;
+    if (err.status >= 400) return `TTS request error (${err.status}) — ${err.message}`;
+    if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+      return 'Cannot reach TTS service — check if container is running';
+    }
+    return err.message;
+  }
+
   clear() {
     this._queue = [];
+    this._cancelled = true;
     if (this._abortController) {
       this._abortController.abort();
       this._abortController = null;

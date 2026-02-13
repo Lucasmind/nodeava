@@ -12,6 +12,7 @@ import { log, error, warn } from '../utils/logger.js';
 const SENTENCE_END_RE = /(?<=[a-zA-Z,\])"'])[.!?]\s+/;
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 1000;
+const SPEAKING_TIMEOUT_MS = 30000;
 
 // Qwen3 thinking tags: <think>...</think> followed by the actual response
 const THINK_OPEN = '<think>';
@@ -63,6 +64,7 @@ export class Orchestrator {
     this._currentEmotion = null;
     this._pendingSentences = 0;
     this._llmDone = false;
+    this._speakingTimer = null;
   }
 
   async init(containerEl, onProgress = null) {
@@ -99,6 +101,9 @@ export class Orchestrator {
         this.avatar.speakAudio(audioData, {}, (word) => {
           if (this.onAssistantToken) this.onAssistantToken(word);
         });
+      } else {
+        warn('TTS failed for a sentence, skipping');
+        if (this.onError) this.onError('Speech synthesis failed for a sentence');
       }
 
       // Track when sentences finish (null = TTS failed, still count it)
@@ -252,6 +257,7 @@ export class Orchestrator {
     if (!clean) return;
     this.state.transition(States.SPEAKING);
     this._pendingSentences++;
+    this._resetSpeakingTimeout();
     if (this.onAssistantSentence) this.onAssistantSentence(clean);
     this.tts.synthesize(clean);
   }
@@ -302,6 +308,7 @@ export class Orchestrator {
   }
 
   _finishSpeaking() {
+    this._clearSpeakingTimeout();
     // Brief pause after last audio before transitioning to idle
     setTimeout(() => {
       if (this.state.is(States.SPEAKING)) {
@@ -310,8 +317,30 @@ export class Orchestrator {
     }, 200);
   }
 
+  _resetSpeakingTimeout() {
+    this._clearSpeakingTimeout();
+    this._speakingTimer = setTimeout(() => {
+      if (this.state.is(States.SPEAKING)) {
+        warn('Speaking timeout — forcing transition to IDLE');
+        this.tts.clear();
+        this.avatar.stopSpeaking();
+        this._pendingSentences = 0;
+        this.state.transition(States.IDLE);
+        if (this.onError) this.onError('Speech timed out');
+      }
+    }, SPEAKING_TIMEOUT_MS);
+  }
+
+  _clearSpeakingTimeout() {
+    if (this._speakingTimer) {
+      clearTimeout(this._speakingTimer);
+      this._speakingTimer = null;
+    }
+  }
+
   interrupt() {
     log('Interrupting...');
+    this._clearSpeakingTimeout();
     this.llm.abort();
     this.tts.clear();
     this.avatar.stopSpeaking();
