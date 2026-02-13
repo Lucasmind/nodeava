@@ -66,6 +66,8 @@ Open **http://localhost:3000** — type or speak to Ava.
 
 ## Architecture
 
+![NodeAva Architecture](docs/architecture-diagram.png)
+
 ```
 Browser (localhost:3000)
   └── nginx ──┬── /api/stt/ ──► whisper.cpp  (Vulkan,  port 8080)
