@@ -28,9 +28,9 @@ NodeAva is a 3D talking avatar powered entirely by local AI models:
 NodeAva doesn't ship with an avatar model for licensing reasons. You need to provide a GLB file with ARKit blend shapes and Oculus Visemes.
 
 **Quickest path:**
-1. Go to [readyplayer.me](https://readyplayer.me)
-2. Create an avatar
-3. Export as GLB with morph targets (ARKit + Oculus Visemes)
+1. Download [VRoid Studio](https://vroid.com/en/studio) (free)
+2. Create a character
+3. Export as VRM (TalkingHead supports VRM natively)
 4. Save as `frontend/public/avatars/default-avatar.glb`
 
 See `frontend/public/avatars/README.md` for more options.

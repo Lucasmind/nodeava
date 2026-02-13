@@ -13,20 +13,14 @@ The GLB model must include:
 
 ## Getting a Compatible Avatar
 
-### Option 1: Ready Player Me (easiest)
-1. Visit https://readyplayer.me
-2. Create an avatar (cartoon or realistic)
-3. Export as GLB with morph targets: ARKit, Oculus Visemes
-4. Save as `default-avatar.glb` in this directory
-
-### Option 2: VRoid Studio (free, more customizable)
+### Option 1: VRoid Studio (free, recommended)
 1. Download VRoid Studio from https://vroid.com/en/studio
 2. Create a character
-3. Export as VRM
-4. Convert VRM to GLB (VRM is GLB-based, may work directly with TalkingHead)
+3. Export as VRM (TalkingHead supports VRM natively — no conversion needed)
+4. Rename the file to `default-avatar.glb` and place it in this directory
 
-### Option 3: Pre-made models
-Search for "VRM avatar free" or "Ready Player Me GLB" for compatible models.
+### Option 2: Pre-made models
+Search for "VRM avatar free" or "GLB avatar ARKit blend shapes" for compatible models.
 Make sure the license allows your intended use.
 
 ## File naming
