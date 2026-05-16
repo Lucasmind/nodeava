@@ -10,8 +10,20 @@ This document is the **spine** for the MVP, per the agreed D2 approach: it defin
 
 ## 1. Goals and non-goals
 
+### Workshop format
+**3-hour session**, attendees install on their own laptops (8GB GPU minimum, pre-announced). Rough pacing target:
+
+| Block | ~30 min | Activity |
+|---|---|---|
+| 1 | 0:00 - 0:30 | Install (USB-stick fallback ready) + preflight + first avatar greeting |
+| 2 | 0:30 - 1:00 | Tier A tour: see the brain work (pipeline viz / brain pane / tool trace / offline) |
+| 3 | 1:00 - 1:30 | Wiki RAG: "what is NodeAva?" + drop-to-ingest a doc |
+| 4 | 1:30 - 2:00 | Swap LLM / voice / avatar — by command center **or** by CLI |
+| 5 | 2:00 - 2:30 | Web search + cloud provider swap + benchmark |
+| 6 | 2:30 - 3:00 | "Make it yours": personality preset, preset URL share, Q&A |
+
 ### Workshop success criteria
-A workshop attendee can, in 90 minutes, on their own laptop (8GB GPU minimum):
+A workshop attendee can, by the end of the 3-hour session, on their own laptop:
 
 1. Install NodeAva with a single OS-appropriate command.
 2. Talk to their avatar end-to-end (mic → STT → LLM → TTS → lip-synced 3D head).
@@ -454,6 +466,34 @@ IDLE → LISTENING → TRANSCRIBING → THINKING ↔ TOOL_CALLING ↔ WIKI_QUERY
 
 ## 4. Cross-cutting concerns
 
+### CLI parity with the command center (workshop dual-track)
+
+**Every operation in the command center MUST also be doable from a shell script.** Workshop attendees split into two tracks based on preference:
+
+- **GUI track:** click around the command center.
+- **CLI track:** run the same operation from `scripts/` — for attendees who want to see what's actually happening under the hood.
+
+Pedagogically critical: the CLI track is where attendees learn that "swap a model" is just an HTTP POST + a process restart, not magic. The same scripts also let presenters demo from a terminal on the projector.
+
+**Required CLI scripts** (parity with command center actions):
+
+| Command center action | CLI counterpart |
+|---|---|
+| Swap LLM model | `scripts/swap-model.sh <model-name>` |
+| Swap TTS voice | `scripts/swap-voice.sh <voice>` |
+| Swap avatar | `scripts/swap-avatar.sh <avatar.glb>` |
+| Switch provider | `scripts/set-provider.sh <local\|anthropic\|openai\|groq> [--model X]` |
+| Load preset | `scripts/load-preset.sh <preset-url-or-file>` |
+| Run benchmark | `scripts/benchmark.sh` |
+| Reset to defaults | `scripts/reset-defaults.sh` |
+| Drop file into wiki | `scripts/ingest.sh <file-or-url>` |
+| Trigger web search | `scripts/ask.sh --search "query"` |
+| Health check all services | `scripts/health.sh` |
+
+**Contract:** each script is a thin wrapper that POSTs to the same `nodeava-orch` endpoint the command center uses. No business logic in the script — pure curl-and-jq style. PowerShell equivalents (`.ps1`) for Windows attendees.
+
+**Day target:** Day 2 (alongside their UI counterparts).
+
 ### Long context tuning
 - Default llama-server flags: `-c 32768 --cache-type-k q4_0 --cache-type-v q4_0`.
 - Hard ceilings: wiki ≤ 3 pages × 2000 tokens; conversation sliding window at 24K with summary.
@@ -486,7 +526,7 @@ Parked. Add a note in README's "supported configurations" table referencing this
 |---|---|---|
 | **Day 0 (pre-clock)** | Wiki seed | Compile NodeAva self-knowledge wiki using strong model; commit artifact. QA top 15 likely questions. |
 | **Day 1** | Invisible plumbing | (a) nodeava-orch fork with deduped agentic loop and SSE event schema. (b) LiteLLM provider adapter + Local provider. (c) State machine refactor (TOOL_CALLING / WIKI_QUERY) + filler speech. (d) Wiki tools in orchestrator. (e) Hardware preflight + installer skeleton. |
-| **Day 2** | Visible scaffolding | (a) Command center shell (panels + bottom drawer). (b) All four Tier A panels (pipeline visualizer, brain pane, tool trace, offline badge). (c) Model/voice/avatar swap UI. (d) Provider swap UI. (e) Wiki drop-to-ingest. |
+| **Day 2** | Visible scaffolding | (a) Command center shell (panels + bottom drawer). (b) All four Tier A panels (pipeline visualizer, brain pane, tool trace, offline badge). (c) Model/voice/avatar swap UI **and matching CLI scripts** (CLI parity). (d) Provider swap UI + CLI. (e) Wiki drop-to-ingest UI + `scripts/ingest.sh`. |
 | **Day 3** | Completion + polish | (a) Walkthrough overlay. (b) Benchmark button. (c) Preset URL share + reset-to-defaults. (d) Per-OS install polish + clean-VM smoke tests. (e) README rewrite per-OS. (f) **If slack remains, pick at most one from:** Windows+AMD path, voice clone PoC. |
 
 ---
@@ -541,6 +581,7 @@ Before the workshop, run the **dress rehearsal scenario** on a clean VM per OS:
 8. Drop a PDF into command center → wiki gains a new page → ask a question about it.
 9. Benchmark button → result card renders, shareable.
 10. Reset button → returns to ship defaults.
+11. **Repeat steps 5-9 from the CLI** (`scripts/swap-model.sh`, `scripts/set-provider.sh`, `scripts/ingest.sh`, etc.) — verify CLI parity with the command center.
 
 If any step fails on a tested OS, that's a blocker, not a polish item.
 
