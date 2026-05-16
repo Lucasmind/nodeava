@@ -42,6 +42,11 @@ pip install -e .
 
 # Point at a running llama-server (the workshop default port is 8081).
 export LLAMA_URL=http://localhost:8081
+
+# Production-style — honors BIND_HOST / BIND_PORT from env.
+python -m orchestrator.main
+
+# Or for hot-reload during development:
 uvicorn orchestrator.main:app --reload --port 8088
 ```
 

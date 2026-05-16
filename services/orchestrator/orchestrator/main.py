@@ -35,3 +35,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
 
 app = create_app()
+
+
+def run() -> None:
+    """Launch uvicorn honoring BIND_HOST / BIND_PORT settings.
+
+    Used by `python -m orchestrator.main` and the Dockerfile CMD so the
+    workshop's localhost-only security default is actually enforced —
+    not just documented in Settings.
+    """
+    import uvicorn
+
+    settings: Settings = app.state.settings
+    uvicorn.run(
+        "orchestrator.main:app",
+        host=settings.bind_host,
+        port=settings.bind_port,
+        log_level="info",
+    )
+
+
+if __name__ == "__main__":
+    run()

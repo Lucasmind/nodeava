@@ -136,3 +136,29 @@ async def test_chat_streaming_emits_openai_chunks_then_done(app_client):
 
     assert contents == ["Hi", "!"]
     assert body.rstrip().endswith("data: [DONE]")
+
+
+def test_run_uses_settings_bind_host_and_port(monkeypatch):
+    """`run()` must pass settings.bind_host / settings.bind_port to uvicorn —
+    so the localhost-only default isn't silently bypassed."""
+    from orchestrator import main as orch_main
+
+    captured = {}
+
+    def fake_run(app_target, *, host, port, log_level):  # noqa: ARG001
+        captured["host"] = host
+        captured["port"] = port
+        captured["app_target"] = app_target
+
+    monkeypatch.setattr("uvicorn.run", fake_run)
+    orch_main.app.state.settings.bind_host = "203.0.113.4"
+    orch_main.app.state.settings.bind_port = 9999
+    try:
+        orch_main.run()
+    finally:
+        orch_main.app.state.settings.bind_host = "127.0.0.1"
+        orch_main.app.state.settings.bind_port = 8088
+
+    assert captured["host"] == "203.0.113.4"
+    assert captured["port"] == 9999
+    assert captured["app_target"] == "orchestrator.main:app"
