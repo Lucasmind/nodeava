@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from orchestrator.events import FinalDoneEvent, TokenEvent
+from orchestrator.events import FinalDoneEvent, ThinkingTokenEvent, TokenEvent
 from orchestrator.providers.litellm_provider import LiteLLMProvider
 
 
@@ -83,4 +83,78 @@ async def test_streaming_emits_token_per_chunk(monkeypatch):
     ]
     deltas = [e.delta for e in events if isinstance(e, TokenEvent)]
     assert deltas == ["Hi", " there"]
+    assert isinstance(events[-1], FinalDoneEvent)
+
+
+async def fake_acompletion_streaming_with_thinking(*, model, messages, stream, api_key, **kwargs):
+    """Mimics LiteLLM streaming an Anthropic extended-thinking response.
+
+    Anthropic emits thinking-block deltas BEFORE visible content. LiteLLM
+    surfaces them on `delta.thinking_blocks` or `delta.reasoning_content`
+    depending on version/provider. Test both surfaces.
+    """
+    assert stream is True
+
+    async def gen():
+        chunks = [
+            # thinking via `thinking_blocks` (Anthropic preferred path)
+            SimpleNamespace(choices=[SimpleNamespace(
+                delta=SimpleNamespace(
+                    content=None,
+                    role="assistant",
+                    thinking_blocks=[{"type": "thinking", "thinking": "user wants a greeting"}],
+                ),
+                finish_reason=None,
+            )]),
+            # thinking via `reasoning_content` (alternate surface)
+            SimpleNamespace(choices=[SimpleNamespace(
+                delta=SimpleNamespace(
+                    content=None,
+                    role=None,
+                    reasoning_content=" then I'll respond",
+                ),
+                finish_reason=None,
+            )]),
+            # visible content
+            SimpleNamespace(choices=[SimpleNamespace(
+                delta=SimpleNamespace(content="Hi!", role=None),
+                finish_reason=None,
+            )]),
+            # finish
+            SimpleNamespace(choices=[SimpleNamespace(
+                delta=SimpleNamespace(content=None, role=None),
+                finish_reason="stop",
+            )]),
+        ]
+        for c in chunks:
+            yield c
+
+    return gen()
+
+
+async def test_streaming_emits_thinking_then_content(monkeypatch):
+    """When LiteLLM exposes reasoning (Anthropic extended thinking), emit
+    ThinkingTokenEvent for thinking deltas and TokenEvent for visible content.
+
+    Both `delta.thinking_blocks` and `delta.reasoning_content` surfaces
+    must be handled so the provider works across LiteLLM versions."""
+    import litellm
+
+    monkeypatch.setattr(litellm, "acompletion", fake_acompletion_streaming_with_thinking)
+
+    provider = LiteLLMProvider(
+        provider_name="anthropic",
+        model="claude-opus-4-7",
+        api_key="sk-ant-test",
+    )
+    events = [
+        e async for e in provider.chat(
+            [{"role": "user", "content": "hi"}], stream=True
+        )
+    ]
+
+    thinking_deltas = [e.delta for e in events if isinstance(e, ThinkingTokenEvent)]
+    token_deltas = [e.delta for e in events if isinstance(e, TokenEvent)]
+    assert thinking_deltas == ["user wants a greeting", " then I'll respond"]
+    assert token_deltas == ["Hi!"]
     assert isinstance(events[-1], FinalDoneEvent)

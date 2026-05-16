@@ -11,7 +11,12 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
-from orchestrator.events import Event, FinalDoneEvent, TokenEvent
+from orchestrator.events import (
+    Event,
+    FinalDoneEvent,
+    ThinkingTokenEvent,
+    TokenEvent,
+)
 from orchestrator.providers.base import Provider
 
 log = logging.getLogger("orchestrator.providers.litellm")
@@ -87,8 +92,34 @@ class LiteLLMProvider(Provider):
             delta = getattr(choices[0], "delta", None)
             if delta is None:
                 continue
+
+            # Thinking deltas — two known surfaces across LiteLLM versions
+            for thinking_text in _extract_thinking_deltas(delta):
+                yield ThinkingTokenEvent(delta=thinking_text)
+
             content = getattr(delta, "content", None)
             if content:
                 yield TokenEvent(delta=content)
 
         yield FinalDoneEvent()
+
+
+def _extract_thinking_deltas(delta: Any) -> list[str]:
+    """Pull reasoning text out of a streaming delta regardless of surface.
+
+    LiteLLM exposes Anthropic extended-thinking via either:
+      - `delta.thinking_blocks` — list of {"type": "thinking", "thinking": str}
+      - `delta.reasoning_content` — flat string (alternate surface)
+    Return non-empty strings in source order.
+    """
+    out: list[str] = []
+    blocks = getattr(delta, "thinking_blocks", None) or []
+    for b in blocks:
+        if isinstance(b, dict) and b.get("type") == "thinking":
+            text = b.get("thinking") or ""
+            if text:
+                out.append(text)
+    reasoning = getattr(delta, "reasoning_content", None)
+    if reasoning:
+        out.append(reasoning)
+    return out
