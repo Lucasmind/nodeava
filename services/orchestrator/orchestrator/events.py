@@ -1,9 +1,9 @@
 """Typed event models emitted by Providers and consumed by the SSE encoder.
 
-This module defines the events used in Plan #1 (foundation). Plans #2-#4 will
-extend with ThinkingTokenEvent, ToolCallStartEvent, ToolCallEndEvent,
-StageTimingEvent, etc. The discriminator is `type` so JSON consumers can
-route on a single field.
+Plans extend this union as new event types arrive:
+  Plan #1: TokenEvent, FinalDoneEvent, ErrorEvent
+  Plan #2: ThinkingTokenEvent (this file)
+  Plan #4 will add: ToolCallStartEvent, ToolCallEndEvent, StageTimingEvent
 """
 from typing import Literal, Union
 
@@ -12,6 +12,16 @@ from pydantic import BaseModel
 
 class TokenEvent(BaseModel):
     type: Literal["token"] = "token"
+    delta: str
+
+
+class ThinkingTokenEvent(BaseModel):
+    """Reasoning content emitted by providers that expose it (e.g. Anthropic
+    extended thinking). The frontend's brain-pane subscribes to these on
+    a named SSE channel — they are NOT mixed into the user-visible content
+    stream.
+    """
+    type: Literal["thinking_token"] = "thinking_token"
     delta: str
 
 
@@ -24,4 +34,4 @@ class ErrorEvent(BaseModel):
     message: str
 
 
-Event = Union[TokenEvent, FinalDoneEvent, ErrorEvent]
+Event = Union[TokenEvent, ThinkingTokenEvent, FinalDoneEvent, ErrorEvent]

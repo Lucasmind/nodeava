@@ -1,5 +1,5 @@
 """Tests for the typed Event models."""
-from orchestrator.events import Event, TokenEvent, FinalDoneEvent, ErrorEvent
+from orchestrator.events import Event, TokenEvent, FinalDoneEvent, ErrorEvent, ThinkingTokenEvent
 
 
 def test_token_event_serialization():
@@ -29,3 +29,19 @@ def test_event_is_abstract_base_via_discriminator():
     ]
     types = [e.type for e in events]
     assert types == ["token", "final_done", "error"]
+
+
+def test_thinking_token_event_serialization():
+    e = ThinkingTokenEvent(delta="hmm let me think")
+    assert e.model_dump() == {"type": "thinking_token", "delta": "hmm let me think"}
+
+
+def test_thinking_token_event_in_union():
+    """ThinkingTokenEvent is part of the Event union."""
+    events: list[Event] = [
+        TokenEvent(delta="visible"),
+        ThinkingTokenEvent(delta="hidden"),
+        FinalDoneEvent(),
+    ]
+    types = [e.type for e in events]
+    assert types == ["token", "thinking_token", "final_done"]
