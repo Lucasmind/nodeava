@@ -6,12 +6,17 @@ worry about adapting its response shape into our typed Event stream.
 
 In Plan #2 only chat is implemented (non-streaming + streaming). Tool
 support arrives in Plan #4.
+
+Error contract: LiteLLM exceptions (APIError, AuthenticationError,
+APIConnectionError, etc.) do NOT raise out of the generator. They emit
+ErrorEvent + FinalDoneEvent — same contract as LocalLlamaProvider.
 """
 import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
 from orchestrator.events import (
+    ErrorEvent,
     Event,
     FinalDoneEvent,
     ThinkingTokenEvent,
@@ -56,13 +61,25 @@ class LiteLLMProvider(Provider):
     ) -> AsyncIterator[Event]:
         import litellm
 
-        resp = await litellm.acompletion(
-            model=self._model,
-            messages=messages,
-            stream=False,
-            api_key=self._api_key,
-            timeout=self._timeout,
-        )
+        try:
+            resp = await litellm.acompletion(
+                model=self._model,
+                messages=messages,
+                stream=False,
+                api_key=self._api_key,
+                timeout=self._timeout,
+            )
+        except litellm.APIError as e:
+            log.warning("LiteLLM error: %s", e)
+            yield ErrorEvent(message=str(e))
+            yield FinalDoneEvent()
+            return
+        except Exception as e:  # last-resort safety net
+            log.warning("Unexpected LiteLLM error: %s", e)
+            yield ErrorEvent(message=f"LiteLLM error: {e}")
+            yield FinalDoneEvent()
+            return
+
         choices = resp.choices or []
         if not choices:
             yield FinalDoneEvent()
@@ -77,29 +94,38 @@ class LiteLLMProvider(Provider):
     ) -> AsyncIterator[Event]:
         import litellm
 
-        stream_iter = await litellm.acompletion(
-            model=self._model,
-            messages=messages,
-            stream=True,
-            api_key=self._api_key,
-            timeout=self._timeout,
-        )
+        try:
+            stream_iter = await litellm.acompletion(
+                model=self._model,
+                messages=messages,
+                stream=True,
+                api_key=self._api_key,
+                timeout=self._timeout,
+            )
+            async for chunk in stream_iter:
+                choices = getattr(chunk, "choices", None) or []
+                if not choices:
+                    continue
+                delta = getattr(choices[0], "delta", None)
+                if delta is None:
+                    continue
 
-        async for chunk in stream_iter:
-            choices = getattr(chunk, "choices", None) or []
-            if not choices:
-                continue
-            delta = getattr(choices[0], "delta", None)
-            if delta is None:
-                continue
+                for thinking_text in _extract_thinking_deltas(delta):
+                    yield ThinkingTokenEvent(delta=thinking_text)
 
-            # Thinking deltas — two known surfaces across LiteLLM versions
-            for thinking_text in _extract_thinking_deltas(delta):
-                yield ThinkingTokenEvent(delta=thinking_text)
-
-            content = getattr(delta, "content", None)
-            if content:
-                yield TokenEvent(delta=content)
+                content = getattr(delta, "content", None)
+                if content:
+                    yield TokenEvent(delta=content)
+        except litellm.APIError as e:
+            log.warning("LiteLLM error during streaming: %s", e)
+            yield ErrorEvent(message=str(e))
+            yield FinalDoneEvent()
+            return
+        except Exception as e:
+            log.warning("Unexpected LiteLLM streaming error: %s", e)
+            yield ErrorEvent(message=f"LiteLLM error: {e}")
+            yield FinalDoneEvent()
+            return
 
         yield FinalDoneEvent()
 

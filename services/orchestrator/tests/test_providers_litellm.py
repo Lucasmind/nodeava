@@ -158,3 +158,40 @@ async def test_streaming_emits_thinking_then_content(monkeypatch):
     assert thinking_deltas == ["user wants a greeting", " then I'll respond"]
     assert token_deltas == ["Hi!"]
     assert isinstance(events[-1], FinalDoneEvent)
+
+
+from orchestrator.events import ErrorEvent
+
+
+async def fake_acompletion_raising(*, model, messages, stream, api_key, **kwargs):
+    """Simulates LiteLLM raising on auth failure."""
+    import litellm
+    raise litellm.AuthenticationError(
+        message="invalid api key",
+        llm_provider="anthropic",
+        model=model,
+    )
+
+
+async def test_auth_error_emits_error_event(monkeypatch):
+    """LiteLLM raises an APIError subclass → provider yields ErrorEvent + FinalDoneEvent."""
+    import litellm
+
+    monkeypatch.setattr(litellm, "acompletion", fake_acompletion_raising)
+
+    provider = LiteLLMProvider(
+        provider_name="anthropic",
+        model="claude-haiku-4-5-20251001",
+        api_key="bogus",
+    )
+    events = [
+        e async for e in provider.chat(
+            [{"role": "user", "content": "hi"}], stream=False
+        )
+    ]
+
+    error_events = [e for e in events if isinstance(e, ErrorEvent)]
+    done_events = [e for e in events if isinstance(e, FinalDoneEvent)]
+    assert len(error_events) == 1
+    assert "api key" in error_events[0].message.lower() or "auth" in error_events[0].message.lower()
+    assert len(done_events) == 1
