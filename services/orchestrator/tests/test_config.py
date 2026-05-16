@@ -30,3 +30,21 @@ def test_env_overrides(monkeypatch):
     assert s.request_timeout == 60.0
     assert s.bind_host == "0.0.0.0"
     assert s.bind_port == 9000
+
+
+def test_provider_defaults_to_local(monkeypatch):
+    """No PROVIDER env → default to local."""
+    for k in ("PROVIDER", "PROVIDER_MODEL"):
+        monkeypatch.delenv(k, raising=False)
+    s = Settings()
+    assert s.provider == "local"
+    assert s.provider_model == ""
+
+
+def test_provider_env_override(monkeypatch):
+    """PROVIDER + PROVIDER_MODEL env vars set the deploy default."""
+    monkeypatch.setenv("PROVIDER", "anthropic")
+    monkeypatch.setenv("PROVIDER_MODEL", "claude-haiku-4-5-20251001")
+    s = Settings()
+    assert s.provider == "anthropic"
+    assert s.provider_model == "claude-haiku-4-5-20251001"
