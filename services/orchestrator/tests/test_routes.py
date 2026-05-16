@@ -55,3 +55,33 @@ async def test_models_returns_empty_list_if_backend_down(app_client):
     resp = await app_client.get("/v1/models")
     assert resp.status_code == 200
     assert resp.json() == {"object": "list", "data": []}
+
+
+@respx.mock
+async def test_chat_non_streaming_returns_openai_shape(app_client):
+    """Non-streaming chat returns an OpenAI-shaped JSON response with the
+    full text in choices[0].message.content."""
+    respx.post("http://localhost:8081/v1/chat/completions").mock(
+        return_value=Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": "Greetings."},
+                        "finish_reason": "stop",
+                    }
+                ]
+            },
+        )
+    )
+
+    resp = await app_client.post(
+        "/v1/chat/completions",
+        json={"messages": [{"role": "user", "content": "hi"}]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["choices"][0]["message"]["content"] == "Greetings."
+    assert body["choices"][0]["finish_reason"] == "stop"
+    assert body["object"] == "chat.completion"
