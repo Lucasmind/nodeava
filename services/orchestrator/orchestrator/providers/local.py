@@ -2,8 +2,9 @@
 
 The llama-server speaks OpenAI-compatible HTTP. This provider POSTs the
 messages and translates either the JSON response (non-streaming) or the
-SSE stream (streaming, added in Task 7) into typed Events.
+SSE stream (streaming) into typed Events.
 """
+import json
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -25,10 +26,11 @@ class LocalLlamaProvider(Provider):
         stream: bool = False,
     ) -> AsyncIterator[Event]:
         if stream:
-            raise NotImplementedError("streaming added in Task 7")
-
-        async for event in self._chat_non_streaming(messages):
-            yield event
+            async for event in self._chat_streaming(messages):
+                yield event
+        else:
+            async for event in self._chat_non_streaming(messages):
+                yield event
 
     async def _chat_non_streaming(
         self, messages: list[dict[str, Any]]
@@ -48,4 +50,34 @@ class LocalLlamaProvider(Provider):
 
         content = choices[0].get("message", {}).get("content") or ""
         yield TokenEvent(delta=content)
+        yield FinalDoneEvent()
+
+    async def _chat_streaming(
+        self, messages: list[dict[str, Any]]
+    ) -> AsyncIterator[Event]:
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            async with client.stream(
+                "POST",
+                f"{self._base_url}/v1/chat/completions",
+                json={"messages": messages, "stream": True},
+            ) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line or not line.startswith("data: "):
+                        continue
+                    payload = line.removeprefix("data: ").strip()
+                    if payload == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(payload)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = chunk.get("choices") or []
+                    if not choices:
+                        continue
+                    delta = choices[0].get("delta") or {}
+                    content = delta.get("content")
+                    if content:
+                        yield TokenEvent(delta=content)
+
         yield FinalDoneEvent()
