@@ -100,6 +100,8 @@ echo "  STT started (PID $STT_PID)"
 echo "Starting TTS (Kokoro-FastAPI, port $TTS_PORT)..."
 cd "$KOKORO_DIR"
 USE_GPU=true DEVICE_TYPE=mps PYTORCH_ENABLE_MPS_FALLBACK=1 \
+  MODEL_DIR="$KOKORO_DIR/api/src/models" \
+  VOICES_DIR="$KOKORO_DIR/api/src/voices/v1_0" \
   uv run python -m api.src.main \
   --host 0.0.0.0 --port "$TTS_PORT" \
   > "$PROJECT_DIR/logs/tts.log" 2>&1 &
