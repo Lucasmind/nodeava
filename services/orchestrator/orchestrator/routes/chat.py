@@ -63,4 +63,21 @@ async def _non_streaming(provider, messages) -> JSONResponse:
 
 
 async def _streaming(provider, messages) -> StreamingResponse:
-    raise NotImplementedError("streaming added in Task 13")
+    async def gen():
+        # Initial role chunk (OpenAI convention — many clients expect this).
+        yield encode_openai_chunk(delta_content=None, role="assistant")
+
+        async for event in provider.chat(messages, stream=True):
+            if isinstance(event, TokenEvent):
+                yield encode_openai_chunk(delta_content=event.delta)
+            elif isinstance(event, ErrorEvent):
+                # Emit on the named SSE event channel so the frontend can
+                # display the error without confusing the OpenAI SDK parser.
+                yield encode_sse(event)
+            elif isinstance(event, FinalDoneEvent):
+                break
+
+        yield encode_openai_chunk(delta_content=None, finish_reason="stop")
+        yield encode_openai_done()
+
+    return StreamingResponse(gen(), media_type="text/event-stream")

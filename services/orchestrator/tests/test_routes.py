@@ -85,3 +85,54 @@ async def test_chat_non_streaming_returns_openai_shape(app_client):
     assert body["choices"][0]["message"]["content"] == "Greetings."
     assert body["choices"][0]["finish_reason"] == "stop"
     assert body["object"] == "chat.completion"
+
+
+import json
+
+
+@respx.mock
+async def test_chat_streaming_emits_openai_chunks_then_done(app_client):
+    """Streaming chat: each TokenEvent → an OpenAI-shaped `data: {...}` chunk;
+    FinalDoneEvent → `data: [DONE]`."""
+    sse_body = (
+        b'data: {"choices":[{"delta":{"role":"assistant"},"index":0,"finish_reason":null}]}\n\n'
+        b'data: {"choices":[{"delta":{"content":"Hi"},"index":0,"finish_reason":null}]}\n\n'
+        b'data: {"choices":[{"delta":{"content":"!"},"index":0,"finish_reason":null}]}\n\n'
+        b'data: {"choices":[{"delta":{},"index":0,"finish_reason":"stop"}]}\n\n'
+        b'data: [DONE]\n\n'
+    )
+    respx.post("http://localhost:8081/v1/chat/completions").mock(
+        return_value=Response(
+            200,
+            content=sse_body,
+            headers={"content-type": "text/event-stream"},
+        )
+    )
+
+    async with app_client.stream(
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "messages": [{"role": "user", "content": "hi"}],
+            "stream": True,
+        },
+    ) as resp:
+        assert resp.status_code == 200
+        assert "text/event-stream" in resp.headers["content-type"]
+        body = (await resp.aread()).decode()
+
+    # Parse the SSE body: collect content from data: chunks before [DONE].
+    contents = []
+    for line in body.split("\n"):
+        if not line.startswith("data: "):
+            continue
+        payload = line.removeprefix("data: ").strip()
+        if payload == "[DONE]":
+            continue
+        chunk = json.loads(payload)
+        delta = chunk.get("choices", [{}])[0].get("delta", {})
+        if "content" in delta:
+            contents.append(delta["content"])
+
+    assert contents == ["Hi", "!"]
+    assert body.rstrip().endswith("data: [DONE]")
