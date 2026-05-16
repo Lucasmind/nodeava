@@ -29,7 +29,7 @@ Env vars (loaded via `pydantic-settings`):
 | `LLAMA_URL` | `http://localhost:8081` | Backend llama-server URL |
 | `REQUEST_TIMEOUT` | `300` | Seconds, applies to all backend calls |
 | `BIND_HOST` | `127.0.0.1` | Listener host. Default = localhost only. |
-| `BIND_PORT` | `8088` | Listener port. |
+| `BIND_PORT` | `8082` | Listener port. |
 
 ## Run locally (dev)
 
@@ -47,7 +47,7 @@ export LLAMA_URL=http://localhost:8081
 python -m orchestrator.main
 
 # Or for hot-reload during development:
-uvicorn orchestrator.main:app --reload --port 8088
+uvicorn orchestrator.main:app --reload --port 8082
 ```
 
 ## Run via Docker (with the rest of NodeAva)

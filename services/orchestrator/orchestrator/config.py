@@ -15,4 +15,4 @@ class Settings(BaseSettings):
     llama_url: str = "http://localhost:8081"
     request_timeout: float = 300.0
     bind_host: str = "127.0.0.1"
-    bind_port: int = 8088
+    bind_port: int = 8082

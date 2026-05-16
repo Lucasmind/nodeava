@@ -157,7 +157,7 @@ def test_run_uses_settings_bind_host_and_port(monkeypatch):
         orch_main.run()
     finally:
         orch_main.app.state.settings.bind_host = "127.0.0.1"
-        orch_main.app.state.settings.bind_port = 8088
+        orch_main.app.state.settings.bind_port = 8082
 
     assert captured["host"] == "203.0.113.4"
     assert captured["port"] == 9999

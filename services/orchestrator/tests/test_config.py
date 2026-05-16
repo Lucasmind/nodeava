@@ -14,7 +14,7 @@ def test_defaults_when_no_env(monkeypatch):
     assert s.llama_url == "http://localhost:8081"
     assert s.request_timeout == 300.0
     assert s.bind_host == "127.0.0.1"
-    assert s.bind_port == 8088
+    assert s.bind_port == 8082
 
 
 def test_env_overrides(monkeypatch):

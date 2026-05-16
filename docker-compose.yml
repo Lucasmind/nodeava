@@ -42,18 +42,18 @@ services:
     image: nodeava-orch:latest
     container_name: nodeava-orch
     ports:
-      - "127.0.0.1:8088:8088"
+      - "127.0.0.1:8082:8082"
     environment:
       - LLAMA_URL=http://llm:8080
       - REQUEST_TIMEOUT=300
       - BIND_HOST=0.0.0.0
-      - BIND_PORT=8088
+      - BIND_PORT=8082
     depends_on:
       llm:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
       interval: 30s
       timeout: 5s
       retries: 3
