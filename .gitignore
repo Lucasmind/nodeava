@@ -9,3 +9,4 @@ models/*.gguf
 .pids/
 logs/
 .playwright-mcp/
+docker-compose.test.yml
