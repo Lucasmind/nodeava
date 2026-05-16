@@ -25,3 +25,33 @@ async def test_health_503_when_backend_unhealthy(app_client):
     body = resp.json()
     assert body["status"] == "unhealthy"
     assert "backend" in body
+
+
+@respx.mock
+async def test_models_proxies_backend_list(app_client):
+    """GET /v1/models proxies the backend's /v1/models response."""
+    respx.get("http://localhost:8081/v1/models").mock(
+        return_value=Response(
+            200,
+            json={
+                "object": "list",
+                "data": [{"id": "qwen3-4b", "object": "model"}],
+            },
+        )
+    )
+    resp = await app_client.get("/v1/models")
+    assert resp.status_code == 200
+    assert resp.json()["data"][0]["id"] == "qwen3-4b"
+
+
+@respx.mock
+async def test_models_returns_empty_list_if_backend_down(app_client):
+    """If the backend is unreachable we return an empty list, not 500."""
+    import httpx
+
+    respx.get("http://localhost:8081/v1/models").mock(
+        side_effect=httpx.ConnectError("down")
+    )
+    resp = await app_client.get("/v1/models")
+    assert resp.status_code == 200
+    assert resp.json() == {"object": "list", "data": []}
