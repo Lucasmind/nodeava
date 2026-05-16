@@ -3,3 +3,4 @@ uvicorn[standard]==0.34.*
 httpx==0.28.*
 pydantic==2.*
 pydantic-settings==2.*
+litellm>=1.50,<2.0
