@@ -1,7 +1,7 @@
 """Tests for the SSE encoder."""
 import json
 
-from orchestrator.events import TokenEvent, FinalDoneEvent, ErrorEvent
+from orchestrator.events import TokenEvent, ThinkingTokenEvent, FinalDoneEvent, ErrorEvent
 from orchestrator.sse import encode_sse, encode_openai_chunk, encode_openai_done
 
 
@@ -48,3 +48,15 @@ def test_encode_openai_done():
     """The OpenAI streaming convention terminates the stream with `data: [DONE]`."""
     out = encode_openai_done()
     assert out == "data: [DONE]\n\n"
+
+
+def test_encode_sse_thinking_token_event():
+    """Thinking tokens MUST go on the named SSE channel — never on the
+    default `data:` stream, so they can't contaminate user-visible content."""
+    out = encode_sse(ThinkingTokenEvent(delta="reasoning..."))
+    lines = out.splitlines()
+    assert lines[0] == "event: thinking_token"
+    assert lines[1].startswith("data: ")
+    payload = json.loads(lines[1].removeprefix("data: "))
+    assert payload == {"type": "thinking_token", "delta": "reasoning..."}
+    assert out.endswith("\n\n")
