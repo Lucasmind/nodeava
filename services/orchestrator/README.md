@@ -76,15 +76,42 @@ the orchestrator never reads keys from env vars (defense in depth).
 
 Providers that expose reasoning (Anthropic extended thinking) emit
 `ThinkingTokenEvent` on a NAMED SSE channel — `event: thinking_token`.
-The default `data:` stream stays clean for OpenAI-SDK clients. Hook the
-brain-pane visualizer with:
+The default `data:` stream stays clean for OpenAI-SDK clients.
+
+Note: `EventSource` is GET-only, so the brain-pane parses the SSE body
+from a `fetch` POST response instead:
 
 ```js
-const es = new EventSource('/v1/chat/completions?...');
-es.addEventListener('thinking_token', (ev) => {
-  const { delta } = JSON.parse(ev.data);
-  brainPane.append(delta);
+const resp = await fetch('/v1/chat/completions', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({messages: [...], stream: true}),
 });
+const reader = resp.body.getReader();
+const decoder = new TextDecoder();
+let buf = '';
+while (true) {
+  const {value, done} = await reader.read();
+  if (done) break;
+  buf += decoder.decode(value, {stream: true});
+  // SSE frames are separated by blank lines
+  let idx;
+  while ((idx = buf.indexOf('\n\n')) !== -1) {
+    const frame = buf.slice(0, idx);
+    buf = buf.slice(idx + 2);
+    const lines = frame.split('\n');
+    let event = 'message', data = '';
+    for (const line of lines) {
+      if (line.startsWith('event: ')) event = line.slice(7);
+      else if (line.startsWith('data: ')) data += line.slice(6);
+    }
+    if (event === 'thinking_token') {
+      const {delta} = JSON.parse(data);
+      brainPane.append(delta);
+    }
+    // event === 'message' (default) carries OpenAI-style content chunks
+  }
+}
 ```
 
 OpenAI o-series models hide reasoning entirely — no thinking events
