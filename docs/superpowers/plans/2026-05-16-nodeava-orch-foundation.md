@@ -106,7 +106,7 @@ pydantic-settings==2.*
 -r requirements.txt
 pytest==8.*
 pytest-asyncio==0.24.*
-respx==0.21.*
+respx==0.23.*
 ```
 
 - [ ] **Step 4: Create empty package files**
