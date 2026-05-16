@@ -162,3 +162,112 @@ def test_run_uses_settings_bind_host_and_port(monkeypatch):
     assert captured["host"] == "203.0.113.4"
     assert captured["port"] == 9999
     assert captured["app_target"] == "orchestrator.main:app"
+
+
+async def test_chat_provider_override_routes_to_litellm(app_client, monkeypatch):
+    """body.provider="anthropic" + X-Provider-Key header → request hits LiteLLM,
+    not the local llama-server. Verify by intercepting litellm.acompletion."""
+    from types import SimpleNamespace
+    import litellm
+
+    captured = {}
+
+    async def fake_acompletion(*, model, messages, stream, api_key, **kwargs):
+        captured["model"] = model
+        captured["api_key"] = api_key
+        captured["stream"] = stream
+        return SimpleNamespace(
+            choices=[SimpleNamespace(
+                message=SimpleNamespace(content="From cloud", role="assistant"),
+                finish_reason="stop",
+            )]
+        )
+
+    monkeypatch.setattr(litellm, "acompletion", fake_acompletion)
+
+    resp = await app_client.post(
+        "/v1/chat/completions",
+        json={
+            "provider": "anthropic",
+            "model": "claude-haiku-4-5-20251001",
+            "messages": [{"role": "user", "content": "hi"}],
+        },
+        headers={"X-Provider-Key": "sk-ant-routed"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["choices"][0]["message"]["content"] == "From cloud"
+    assert captured["model"] == "anthropic/claude-haiku-4-5-20251001"
+    assert captured["api_key"] == "sk-ant-routed"
+    assert captured["stream"] is False
+
+
+async def test_chat_streaming_emits_thinking_on_named_channel(app_client, monkeypatch):
+    """Streaming with a cloud provider that exposes thinking should send
+    ThinkingTokenEvent on its named SSE channel — NEVER mixed into the
+    OpenAI-style `data:` content stream."""
+    from types import SimpleNamespace
+    import json
+    import litellm
+
+    async def fake_acompletion(*, model, messages, stream, api_key, **kwargs):
+        async def gen():
+            yield SimpleNamespace(choices=[SimpleNamespace(
+                delta=SimpleNamespace(
+                    content=None,
+                    role="assistant",
+                    thinking_blocks=[{"type": "thinking", "thinking": "hmm"}],
+                ),
+                finish_reason=None,
+            )])
+            yield SimpleNamespace(choices=[SimpleNamespace(
+                delta=SimpleNamespace(content="Hello.", role=None),
+                finish_reason=None,
+            )])
+            yield SimpleNamespace(choices=[SimpleNamespace(
+                delta=SimpleNamespace(content=None, role=None),
+                finish_reason="stop",
+            )])
+        return gen()
+
+    monkeypatch.setattr(litellm, "acompletion", fake_acompletion)
+
+    async with app_client.stream(
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "provider": "anthropic",
+            "model": "claude-opus-4-7",
+            "messages": [{"role": "user", "content": "say hi"}],
+            "stream": True,
+        },
+        headers={"X-Provider-Key": "sk-ant-stream"},
+    ) as resp:
+        assert resp.status_code == 200
+        body = (await resp.aread()).decode()
+
+    # Visible content (OpenAI chunks on default stream)
+    visible_contents = []
+    for line in body.split("\n"):
+        if not line.startswith("data: "):
+            continue
+        payload = line.removeprefix("data: ").strip()
+        if payload == "[DONE]":
+            continue
+        try:
+            chunk = json.loads(payload)
+        except json.JSONDecodeError:
+            continue
+        delta = chunk.get("choices", [{}])[0].get("delta", {})
+        if "content" in delta and delta["content"]:
+            visible_contents.append(delta["content"])
+
+    assert visible_contents == ["Hello."]
+
+    # Thinking events on the named SSE channel
+    assert "event: thinking_token" in body
+    # Each thinking event has its own data line with the delta
+    assert '"delta": "hmm"' in body or '"delta":"hmm"' in body
+
+    # Thinking content MUST NOT appear in any default-stream content chunk
+    for c in visible_contents:
+        assert "hmm" not in c

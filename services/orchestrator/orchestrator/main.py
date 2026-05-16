@@ -4,7 +4,6 @@ import logging
 from fastapi import FastAPI
 
 from orchestrator.config import Settings
-from orchestrator.providers.base import Provider
 from orchestrator.providers.local import LocalLlamaProvider
 from orchestrator.routes import chat, health, models
 
@@ -12,22 +11,19 @@ log = logging.getLogger("orchestrator")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 
-def build_provider(settings: Settings) -> Provider:
-    """Construct the active Provider.
+def create_app(settings: Settings | None = None) -> FastAPI:
+    """Application factory. Tests can inject custom settings.
 
-    Plan #1 always returns a LocalLlamaProvider. Plan #2 will switch on
-    settings.provider to also support LiteLLMProvider.
+    Sets `app.state.local_provider` — the always-available local backend.
+    Cloud providers are constructed per-request by
+    `orchestrator.providers.pick_provider`.
     """
-    return LocalLlamaProvider(
+    settings = settings or Settings()
+    app = FastAPI(title="nodeava-orch", version="0.2.0")
+    app.state.settings = settings
+    app.state.local_provider = LocalLlamaProvider(
         base_url=settings.llama_url, timeout=settings.request_timeout
     )
-
-
-def create_app(settings: Settings | None = None) -> FastAPI:
-    settings = settings or Settings()
-    app = FastAPI(title="nodeava-orch", version="0.1.0")
-    app.state.settings = settings
-    app.state.provider = build_provider(settings)
     app.include_router(health.router)
     app.include_router(models.router)
     app.include_router(chat.router)
@@ -38,12 +34,7 @@ app = create_app()
 
 
 def run() -> None:
-    """Launch uvicorn honoring BIND_HOST / BIND_PORT settings.
-
-    Used by `python -m orchestrator.main` and the Dockerfile CMD so the
-    workshop's localhost-only security default is actually enforced —
-    not just documented in Settings.
-    """
+    """Launch uvicorn honoring BIND_HOST / BIND_PORT settings."""
     import uvicorn
 
     settings: Settings = app.state.settings
