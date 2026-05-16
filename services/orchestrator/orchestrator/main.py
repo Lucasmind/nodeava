@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from orchestrator.config import Settings
 from orchestrator.providers.base import Provider
 from orchestrator.providers.local import LocalLlamaProvider
+from orchestrator.routes import health
 
 log = logging.getLogger("orchestrator")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -28,6 +29,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="nodeava-orch", version="0.1.0")
     app.state.settings = settings
     app.state.provider = build_provider(settings)
+    app.include_router(health.router)
     return app
 
 
